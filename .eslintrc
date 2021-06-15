@@ -9,7 +9,9 @@
     'Uint16Array': true,
     'Uint32Array': true,
     'Int32Array': true,
-    'Float64Array': true
+    'Float64Array': true,
+    'Promise': true,
+    'wx': true
   },
   'rules': {
     /**

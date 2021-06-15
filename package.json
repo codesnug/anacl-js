@@ -1,7 +1,7 @@
 {
-  "name": "tweetnacl",
-  "version": "1.0.3",
-  "description": "Port of TweetNaCl cryptographic library to JavaScript",
+  "name": "anacl",
+  "version": "1.0.3-1",
+  "description": "TweetNaCl.js fork for asynchronous PRNGs",
   "main": "nacl-fast.js",
   "types": "nacl.d.ts",
   "directories": {
@@ -14,11 +14,11 @@
     "build-test-browser": "browserify test/browser/init.js test/*.js | uglifyjs -c -m -o test/browser/_bundle.js 2>/dev/null && browserify test/browser/init.js test/*.quick.js | uglifyjs -c -m -o test/browser/_bundle-quick.js 2>/dev/null",
     "test": "npm run test-node-all",
     "bench": "node test/benchmark/bench.js",
-    "lint": "eslint nacl.js nacl-fast.js test/*.js test/benchmark/*.js"
+    "lint": "eslint nacl.js nacl-fast.js && eslint --env es2017 test/*.js test/benchmark/*.js"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dchest/tweetnacl-js.git"
+    "url": "https://github.com/codesnug/anacl-js.git"
   },
   "keywords": [
     "crypto",
@@ -32,14 +32,15 @@
     "poly1305",
     "public",
     "salsa20",
-    "signatures"
+    "signatures",
+    "wechat"
   ],
-  "author": "TweetNaCl-js contributors",
+  "author": "anacl-js contributors",
   "license": "Unlicense",
   "bugs": {
-    "url": "https://github.com/dchest/tweetnacl-js/issues"
+    "url": "https://github.com/codesnug/anacl-js/issues"
   },
-  "homepage": "https://tweetnacl.js.org",
+  "homepage": "https://github.com/codesnug/anacl-js",
   "devDependencies": {
     "browserify": "^16.2.3",
     "eslint": "^6.8.0",
@@ -47,7 +48,7 @@
     "tap-browser-color": "^0.1.2",
     "tape": "^4.13.0",
     "tweetnacl-util": "^0.15.0",
-    "uglify-js": "^3.7.5"
+    "uglify-js": "^3.13.9"
   },
   "browser": {
     "buffer": false,

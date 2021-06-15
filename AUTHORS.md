@@ -1,3 +1,8 @@
+List of anacl-js authors
+========================
+
+* Martin Chen (@u128393)
+
 List of TweetNaCl.js authors
 ============================
 

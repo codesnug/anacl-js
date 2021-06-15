@@ -23,25 +23,25 @@ var getTime = (function() {
   return Date.now.bind(Date);
 })();
 
-function benchmark(fn, bytes) {
+async function benchmark(fn, bytes) {
   var elapsed = 0;
   var iterations = 1;
   var runsPerIteration = 1;
   // Run once without measuring anything to possibly kick-off JIT.
-  fn();
+  await fn();
   while (true) { // eslint-disable-line
     var startTime = void 0;
     var diff = void 0;
     if (runsPerIteration === 1) {
       // Measure one iteration.
       startTime = getTime();
-      fn();
+      await fn();
       diff = getTime() - startTime;
     } else {
       // Measure many iterations.
       startTime = getTime();
       for (var i = 0; i < runsPerIteration; i++) {
-        fn();
+        await fn();
       }
       diff = getTime() - startTime;
     }
@@ -98,7 +98,7 @@ function report(name, results) {
   );
 }
 
-function crypto_stream_xor_benchmark() {
+async function crypto_stream_xor_benchmark() {
   var m = new Uint8Array(1024),
       n = new Uint8Array(24),
       k = new Uint8Array(32),
@@ -107,35 +107,35 @@ function crypto_stream_xor_benchmark() {
   for (i = 0; i < 1024; i++) m[i] = i & 255;
   for (i = 0; i < 24; i++) n[i] = i;
   for (i = 0; i < 32; i++) k[i] = i;
-  report('crypto_stream_xor 1K', benchmark(function() {
+  report('crypto_stream_xor 1K', await benchmark(function() {
     nacl.lowlevel.crypto_stream_xor(out, 0, m, 0, m.length, n, k);
   }, m.length));
 }
 
-function crypto_onetimeauth_benchmark() {
+async function crypto_onetimeauth_benchmark() {
   var m = new Uint8Array(1024),
       out = new Uint8Array(1024),
       k = new Uint8Array([0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1]);
   for (var i = 0; i < 1024; i++) {
     m[i] = i & 255;
   }
-  report('crypto_onetimeauth 1K', benchmark(function() {
+  report('crypto_onetimeauth 1K', await benchmark(function() {
     nacl.lowlevel.crypto_onetimeauth(out, 0, m, 0, m.length, k);
   }, m.length));
 }
 
-function crypto_secretbox_benchmark() {
+async function crypto_secretbox_benchmark() {
   var i, k = new Uint8Array(32), n = new Uint8Array(24),
       m = new Uint8Array(1024), c = new Uint8Array(1024);
   for (i = 0; i < 32; i++) k[i] = 1;
   for (i = 0; i < 24; i++) n[i] = 2;
   for (i = 0; i < 1024; i++) m[i] = 3;
-  report('crypto_secretbox 1K', benchmark(function() {
+  report('crypto_secretbox 1K', await benchmark(function() {
     nacl.lowlevel.crypto_secretbox(c, m, m.length, n, k);
   }, m.length));
 }
 
-function secretbox_seal_open_benchmark() {
+async function secretbox_seal_open_benchmark() {
   var key = new Uint8Array(32),
       nonce = new Uint8Array(24),
       msg = new Uint8Array(1024),
@@ -144,77 +144,81 @@ function secretbox_seal_open_benchmark() {
   for (i = 0; i < 24; i++) nonce[i] = 2;
   for (i = 0; i < 1024; i++) msg[i] = 3;
 
-  report('secretbox 1K', benchmark(function() {
+  report('secretbox 1K', await benchmark(function() {
     box = nacl.secretbox(msg, nonce, key);
   }, msg.length));
 
-  report('secretbox.open 1K', benchmark(function() {
+  report('secretbox.open 1K', await benchmark(function() {
     nacl.secretbox.open(box, nonce, key);
   }, msg.length));
 }
 
-function crypto_scalarmult_base_benchmark() {
+async function crypto_scalarmult_base_benchmark() {
   var n = new Uint8Array(32), q = new Uint8Array(32);
   for (var i = 0; i < 32; i++) n[i] = i;
-  report('crypto_scalarmult_base', benchmark(function() {
+  report('crypto_scalarmult_base', await benchmark(function() {
     nacl.lowlevel.crypto_scalarmult_base(q, n);
   }));
 }
 
-function box_seal_open_benchmark() {
+async function box_seal_open_benchmark() {
   var pk1 = new Uint8Array(32), sk1 = new Uint8Array(32),
       pk2 = new Uint8Array(32), sk2 = new Uint8Array(32);
-  nacl.lowlevel.crypto_box_keypair(pk1, sk1);
-  nacl.lowlevel.crypto_box_keypair(pk2, sk2);
+  await nacl.lowlevel.crypto_box_keypair(pk1, sk1);
+  await nacl.lowlevel.crypto_box_keypair(pk2, sk2);
   var nonce = decodeUTF8('123456789012345678901234');
   var msg = decodeUTF8((new Array(1024)).join('a'));
   var box = null;
 
-  report('box 1K', benchmark(function() {
+  report('box 1K', await benchmark(function() {
     box = nacl.box(msg, nonce, pk1, sk2);
   }, msg.length));
 
-  report('box.open 1K', benchmark(function() {
+  report('box.open 1K', await benchmark(function() {
     nacl.box.open(box, nonce, pk2, sk1);
   }, msg.length));
 }
 
-function sign_open_benchmark() {
-  var k = nacl.sign.keyPair();
+async function sign_open_benchmark() {
+  var k = await nacl.sign.keyPair();
   var sk = k.secretKey;
   var pk = k.publicKey;
   var msg = decodeUTF8((new Array(128)).join('a'));
   var sm;
 
-  report('sign', benchmark(function() {
+  report('sign', await benchmark(function() {
     sm = nacl.sign(msg, sk);
   }));
 
-  report('sign.open', benchmark(function() {
+  report('sign.open', await benchmark(function() {
     nacl.sign.open(sm, pk);
   }));
 }
 
-function crypto_hash_benchmark() {
+async function crypto_hash_benchmark() {
   var m = new Uint8Array(1024), out = new Uint8Array(64);
   var i;
   for (i = 0; i < m.length; i++) m[i] = i & 255;
-  report('crypto_hash 1K', benchmark(function() {
+  report('crypto_hash 1K', await benchmark(function() {
     nacl.lowlevel.crypto_hash(out, m, m.length);
   }, m.length));
 
   m = new Uint8Array(16*1024);
   for (i = 0; i < m.length; i++) m[i] = i & 255;
-  report('crypto_hash 16K', benchmark(function() {
+  report('crypto_hash 16K', await benchmark(function() {
     nacl.lowlevel.crypto_hash(out, m, m.length);
   }, m.length));
 }
 
-crypto_stream_xor_benchmark();
-crypto_onetimeauth_benchmark();
-crypto_secretbox_benchmark();
-crypto_hash_benchmark();
-secretbox_seal_open_benchmark();
-crypto_scalarmult_base_benchmark();
-box_seal_open_benchmark();
-sign_open_benchmark();
+async function benchmark_all() {
+  await crypto_stream_xor_benchmark();
+  await crypto_onetimeauth_benchmark();
+  await crypto_secretbox_benchmark();
+  await crypto_hash_benchmark();
+  await secretbox_seal_open_benchmark();
+  await crypto_scalarmult_base_benchmark();
+  await box_seal_open_benchmark();
+  await sign_open_benchmark();
+}
+
+benchmark_all();

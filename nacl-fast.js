@@ -1379,8 +1379,9 @@ function crypto_scalarmult_base(q, n) {
 }
 
 function crypto_box_keypair(y, x) {
-  randombytes(x, 32);
-  return crypto_scalarmult_base(y, x);
+  return randombytes(x, 32).then(function() {
+    return crypto_scalarmult_base(y, x);
+  });
 }
 
 function crypto_box_beforenm(k, y, x) {
@@ -1914,12 +1915,11 @@ function scalarbase(p, s) {
   scalarmult(p, q, s);
 }
 
-function crypto_sign_keypair(pk, sk, seeded) {
+function crypto_sign_keypair_seeded(pk, sk) {
   var d = new Uint8Array(64);
   var p = [gf(), gf(), gf(), gf()];
   var i;
 
-  if (!seeded) randombytes(sk, 32);
   crypto_hash(d, sk, 32);
   d[0] &= 248;
   d[31] &= 127;
@@ -1930,6 +1930,12 @@ function crypto_sign_keypair(pk, sk, seeded) {
 
   for (i = 0; i < 32; i++) sk[i+32] = pk[i];
   return 0;
+}
+
+function crypto_sign_keypair(pk, sk, seeded) {
+  return Promise.resolve(seeded || randombytes(sk, 32)).then(function() {
+    return crypto_sign_keypair_seeded(pk, sk);
+  });
 }
 
 var L = new Float64Array([0xed, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9, 0xde, 0x14, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10]);
@@ -2144,7 +2150,7 @@ nacl.lowlevel = {
   set25519: set25519,
   modL: modL,
   scalarmult: scalarmult,
-  scalarbase: scalarbase,
+  scalarbase: scalarbase
 };
 
 /* High-level API */
@@ -2172,8 +2178,9 @@ function cleanup(arr) {
 
 nacl.randomBytes = function(n) {
   var b = new Uint8Array(n);
-  randombytes(b, n);
-  return b;
+  return randombytes(b, n).then(function() {
+    return b;
+  });
 };
 
 nacl.secretbox = function(msg, nonce, key) {
@@ -2246,8 +2253,9 @@ nacl.box.open.after = nacl.secretbox.open;
 nacl.box.keyPair = function() {
   var pk = new Uint8Array(crypto_box_PUBLICKEYBYTES);
   var sk = new Uint8Array(crypto_box_SECRETKEYBYTES);
-  crypto_box_keypair(pk, sk);
-  return {publicKey: pk, secretKey: sk};
+  return crypto_box_keypair(pk, sk).then(function() {
+    return {publicKey: pk, secretKey: sk};
+  });
 };
 
 nacl.box.keyPair.fromSecretKey = function(secretKey) {
@@ -2310,8 +2318,9 @@ nacl.sign.detached.verify = function(msg, sig, publicKey) {
 nacl.sign.keyPair = function() {
   var pk = new Uint8Array(crypto_sign_PUBLICKEYBYTES);
   var sk = new Uint8Array(crypto_sign_SECRETKEYBYTES);
-  crypto_sign_keypair(pk, sk);
-  return {publicKey: pk, secretKey: sk};
+  return crypto_sign_keypair(pk, sk).then(function() {
+    return {publicKey: pk, secretKey: sk};
+  });
 };
 
 nacl.sign.keyPair.fromSecretKey = function(secretKey) {
@@ -2330,7 +2339,7 @@ nacl.sign.keyPair.fromSeed = function(seed) {
   var pk = new Uint8Array(crypto_sign_PUBLICKEYBYTES);
   var sk = new Uint8Array(crypto_sign_SECRETKEYBYTES);
   for (var i = 0; i < 32; i++) sk[i] = seed[i];
-  crypto_sign_keypair(pk, sk, true);
+  crypto_sign_keypair_seeded(pk, sk);
   return {publicKey: pk, secretKey: sk};
 };
 
@@ -2357,12 +2366,31 @@ nacl.verify = function(x, y) {
 };
 
 nacl.setPRNG = function(fn) {
-  randombytes = fn;
+  randombytes = function(x, n) {
+    return new Promise(function(resolve, reject) {
+      try {
+        resolve(fn(x, n));
+      } catch (e) {
+        reject(e);
+      }
+    });
+  };
 };
 
 (function() {
   // Initialize PRNG if environment provides CSPRNG.
   // If not, methods calling randombytes will throw.
+
+  // avoid some bundling tools from automatically browserifying packages
+  function safeRequire(m) {
+    try {
+      var r = 'require';
+      return module[r](m);
+    } catch (e) {
+      return undefined;
+    }
+  }
+
   var crypto = typeof self !== 'undefined' ? (self.crypto || self.msCrypto) : null;
   if (crypto && crypto.getRandomValues) {
     // Browsers.
@@ -2375,16 +2403,29 @@ nacl.setPRNG = function(fn) {
       for (i = 0; i < n; i++) x[i] = v[i];
       cleanup(v);
     });
-  } else if (typeof require !== 'undefined') {
+  } else if ((crypto = safeRequire('crypto')) && crypto.randomBytes) {
     // Node.js.
-    crypto = require('crypto');
-    if (crypto && crypto.randomBytes) {
-      nacl.setPRNG(function(x, n) {
-        var i, v = crypto.randomBytes(n);
-        for (i = 0; i < n; i++) x[i] = v[i];
-        cleanup(v);
+    nacl.setPRNG(function(x, n) {
+      var i, v = crypto.randomBytes(n);
+      for (i = 0; i < n; i++) x[i] = v[i];
+      cleanup(v);
+    });
+  } else if (typeof wx !== 'undefined' && wx.getRandomValues) {
+    // WeChat.
+    nacl.setPRNG(function(x, n) {
+      return new Promise(function(resolve, reject) {
+        wx.getRandomValues({
+          length: n,
+          success: function(r) {
+            var i, v = new Uint8Array(r.randomValues);
+            for (i = 0; i < n; i++) x[i] = v[i];
+            cleanup(v);
+            resolve();
+          },
+          fail: reject
+        });
       });
-    }
+    });
   }
 })();
 
